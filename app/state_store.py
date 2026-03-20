@@ -156,6 +156,15 @@ class StateStore:
             models = db.query(EventModel).order_by(EventModel.id.desc()).limit(limit).all()
             return [model.to_state() for model in models]
 
+    def delete_all_events(self) -> int:
+        """Delete all persisted events and return the number removed."""
+        with self._session() as db:
+            count = db.query(EventModel).count()
+            db.query(EventModel).delete()
+            db.commit()
+            self.logger.info("Deleted %s events from state store", count)
+            return count
+
     def update_event(self, state: EventState) -> EventState:
         """Update an existing event identified by ``state.id``.
         """

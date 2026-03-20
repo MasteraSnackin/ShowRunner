@@ -139,6 +139,23 @@ def test_demo_api_flow_via_http_routes():
     matching = next(event for event in payload["events"] if event["id"] == created["id"])
     assert matching["status"] == "settled"
 
+    status, _, body = asyncio.run(
+        asgi_request("GET", f"/api/events/{created['id']}")
+    )
+    event_detail = json.loads(body)
+    assert status == 200
+    assert event_detail["id"] == created["id"]
+    assert event_detail["status"] == "settled"
+
+    status, _, body = asyncio.run(
+        asgi_request("GET", f"/api/events/{created['id']}/sales-summary")
+    )
+    sales_summary = json.loads(body)
+    assert status == 200
+    assert sales_summary["event_id"] == created["id"]
+    assert sales_summary["tickets_sold"] == 2
+    assert sales_summary["revenue"] == 20.0
+
 
 def test_webhook_rejects_invalid_json_with_structured_400():
     status, headers, body = asyncio.run(
@@ -235,3 +252,41 @@ def test_sales_reject_after_event_is_settled():
     assert status == 409
     assert payload["error"]["code"] == "conflict"
     assert payload["error"]["details"]["status"] == "ready_for_payout"
+
+
+def test_demo_reset_clears_persisted_events():
+    create_payload = json.dumps(
+        {
+            "title": "Reset Candidate",
+            "description": "Used to verify demo reset behavior.",
+            "channel_id": "route-reset-flow",
+        }
+    ).encode()
+
+    status, _, body = asyncio.run(
+        asgi_request(
+            "POST",
+            "/api/demo/events",
+            headers={"content-type": "application/json"},
+            body=create_payload,
+        )
+    )
+    assert status == 200
+    created = json.loads(body)
+
+    status, _, body = asyncio.run(asgi_request("POST", "/api/demo/reset"))
+    payload = json.loads(body)
+    assert status == 200
+    assert payload["status"] == "reset"
+    assert payload["deleted_events"] >= 1
+
+    status, _, body = asyncio.run(asgi_request("GET", "/api/events"))
+    listing = json.loads(body)
+    assert listing["counts"]["total"] == 0
+
+    status, _, body = asyncio.run(
+        asgi_request("GET", f"/api/events/{created['id']}")
+    )
+    missing = json.loads(body)
+    assert status == 404
+    assert missing["error"]["code"] == "not_found"

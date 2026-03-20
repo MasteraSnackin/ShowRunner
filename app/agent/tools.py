@@ -54,3 +54,9 @@ def get_endless_client() -> EndlessClient:
 
 def get_civic_client() -> CivicClient:
     return _civic_client
+
+
+def reset_demo_runtime() -> None:
+    """Reset in-memory runtime state while leaving the configured services intact."""
+    _state_store.delete_all_events()
+    _endless_client.reset_demo_state()

@@ -18,7 +18,7 @@ from ..logging_config import get_logger
 @dataclass
 class TicketType:
     ticket_type_id: int
-    event_id: int
+    event_id: int | str
     title: str
     price: float
     supply: int
@@ -96,10 +96,14 @@ class EndlessClient:
         total_sales = sum(s["quantity"] for s in sales)
         # Calculate revenue using ticket price if a ticket type exists
         ticket_price = 0.0
-        for ticket in self._ticket_types.values():
-            if ticket.event_id == event_id:
-                ticket_price = ticket.price
-                break
+        ticket = self._ticket_types.get(int(event_id))
+        if ticket is not None:
+            ticket_price = ticket.price
+        else:
+            for ticket in self._ticket_types.values():
+                if str(ticket.event_id) == str(event_id):
+                    ticket_price = ticket.price
+                    break
         total_revenue = total_sales * ticket_price
         summary = {
             "total_sales": total_sales,
@@ -134,3 +138,11 @@ class EndlessClient:
     def approve_payout(self, event_id: int | str) -> Dict[str, str]:
         """Compatibility wrapper for workflow code."""
         return self.execute_payouts(int(event_id))
+
+    def reset_demo_state(self) -> None:
+        """Clear in-memory stub state for tests and demo resets."""
+        self._ticket_type_counter = itertools.count(1)
+        self._ticket_types.clear()
+        self._sales.clear()
+        self._tx_counter = itertools.count(1)
+        self.logger.info("Reset Endless demo state")

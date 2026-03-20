@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .agent.orchestrator import handle_event
-from .agent.tools import get_endless_client, get_state_store
+from .agent.tools import get_endless_client, get_state_store, reset_demo_runtime
 from .errors import ApplicationError, BadRequestError, ConflictError, NotFoundError
 from .state_store import EventState
 
@@ -77,6 +77,23 @@ def build_dashboard_payload() -> dict[str, object]:
         "settled": sum(1 for event in events if event["status"] == "settled"),
     }
     return {"events": events, "counts": counts}
+
+
+def build_sales_summary(state: EventState) -> dict[str, object]:
+    if not state.onchain_event_id:
+        raise ConflictError(
+            "Event is missing an on-chain identifier",
+            details={"state_id": state.id},
+        )
+    summary = get_endless_client().sales_summary(state.onchain_event_id)
+    return {
+        "event_id": state.id,
+        "status": state.status,
+        "tickets_sold": summary["tickets_sold"],
+        "revenue": summary["revenue"],
+        "payout_amount": summary["payout_amount"],
+        "sales": summary["sales"],
+    }
 
 
 def require_event(state_id: int) -> EventState:
@@ -186,6 +203,16 @@ def approve_demo_payout(state_id: int) -> dict[str, object]:
     return serialize_event(refreshed)
 
 
+def reset_demo_workspace() -> dict[str, object]:
+    existing = get_state_store().list_events(limit=1000)
+    deleted_count = len(existing)
+    reset_demo_runtime()
+    return {
+        "status": "reset",
+        "deleted_events": deleted_count,
+    }
+
+
 @app.api_route("/", methods=["GET", "HEAD"])
 async def root(request: Request):
     if request.method == "HEAD":
@@ -211,6 +238,16 @@ async def list_events() -> dict[str, object]:
     return build_dashboard_payload()
 
 
+@app.get("/api/events/{state_id}")
+async def get_event(state_id: int) -> dict[str, object]:
+    return serialize_event(require_event(state_id))
+
+
+@app.get("/api/events/{state_id}/sales-summary")
+async def get_event_sales_summary(state_id: int) -> dict[str, object]:
+    return build_sales_summary(require_event(state_id))
+
+
 @app.post("/api/demo/events")
 async def post_event(data: CreateEventRequest) -> dict[str, object]:
     return create_demo_event(data)
@@ -229,6 +266,11 @@ async def post_settle(state_id: int) -> dict[str, object]:
 @app.post("/api/demo/events/{state_id}/payout")
 async def post_payout(state_id: int) -> dict[str, object]:
     return approve_demo_payout(state_id)
+
+
+@app.post("/api/demo/reset")
+async def post_demo_reset() -> dict[str, object]:
+    return reset_demo_workspace()
 
 
 @app.post("/webhook")
