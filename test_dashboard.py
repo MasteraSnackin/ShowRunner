@@ -44,3 +44,17 @@ def test_dashboard_payload_exposes_action_flags():
     assert matching["actions"]["can_record_sale"] is True
     assert matching["actions"]["can_settle"] is True
     assert matching["actions"]["can_payout"] is False
+
+
+def test_dashboard_create_preserves_embedded_quotes():
+    created = create_demo_event(
+        CreateEventRequest(
+            title='Founder "Town Hall"',
+            description='Quoted "VIP" seating for launch night.',
+            channel_id="dashboard-quoted-fields",
+        )
+    )
+
+    assert created["title"] == 'Founder "Town Hall"'
+    assert created["description"].startswith('Founder "Town Hall":')
+    assert '"VIP"' in created["description"]

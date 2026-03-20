@@ -75,7 +75,11 @@ def create_demo_event(data: CreateEventRequest) -> dict[str, object]:
             "type": "command",
             "channel_id": data.channel_id,
             "user_id": "dashboard-user",
-            "text": f'/create_event title="{data.title}" description="{data.description}"',
+            "text": (
+                f"/create_event "
+                f"title={json.dumps(data.title)} "
+                f"description={json.dumps(data.description)}"
+            ),
         }
     )
     state = get_state_store().get_latest_event_by_channel(data.channel_id)

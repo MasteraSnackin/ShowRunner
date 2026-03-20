@@ -83,7 +83,7 @@ def start_event_creation(event: MessageCommandEvent) -> None:
     for part in shlex.split(event.text)[1:]:  # skip the command name
         if "=" in part:
             key, val = part.split("=", 1)
-            args[key] = val.strip('"')
+            args[key] = val
     title = args.get("title", "Untitled Event")
     short_desc = args.get("description", "No description provided.")
 
