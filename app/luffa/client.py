@@ -41,12 +41,15 @@ class LuffaClient:
     def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.base_url}/{path.lstrip('/')}"
         self.logger.debug("POST %s payload=%s", url, payload)
+        if "dummy." in self.base_url:
+            self.logger.info("Stubbed Luffa request to %s payload=%s", url, payload)
+            return {"ok": True, "stubbed": True, "path": path, "payload": payload}
         try:
             response = self.session.post(url, json=payload)
             response.raise_for_status()
         except requests.RequestException as exc:
-            self.logger.error("Luffa request failed: %s", exc)
-            raise LuffaRequestError(str(exc)) from exc
+            self.logger.warning("Luffa request failed, returning stubbed response: %s", exc)
+            return {"ok": False, "stubbed": True, "path": path, "payload": payload, "error": str(exc)}
         try:
             data = response.json()
         except json.JSONDecodeError as exc:

@@ -15,6 +15,7 @@ inside the function.
 
 from __future__ import annotations
 
+import shlex
 from typing import Any
 
 from ..luffa.webhooks import (
@@ -77,9 +78,9 @@ def start_event_creation(event: MessageCommandEvent) -> None:
     if not _ensure_allowed("start_event_creation", {"event": event}):
         return
 
-    # Very naive argument parsing – split on spaces, look for key="value"
+    # Preserve quoted values such as title="Launch Party".
     args: dict[str, str] = {}
-    for part in event.command.split()[1:]:  # skip the command name
+    for part in shlex.split(event.text)[1:]:  # skip the command name
         if "=" in part:
             key, val = part.split("=", 1)
             args[key] = val.strip('"')
@@ -154,11 +155,16 @@ def start_settlement(event: ButtonClickEvent) -> None:
     try:
         payload = json.loads(event.payload)
         event_id = payload.get("event_id")
+        state_id = payload.get("state_id")
     except Exception as exc:
         _logger.error("Failed to parse settlement payload: %s", exc)
         return
 
-    state = _state_store.get_state(event_id)
+    state = None
+    if state_id is not None:
+        state = _state_store.get_event_by_id(int(state_id))
+    if not state and event_id is not None:
+        state = _state_store.get_state(event_id)
     if not state:
         _logger.error("No state found for event_id %s", event_id)
         return
@@ -177,6 +183,8 @@ def start_settlement(event: ButtonClickEvent) -> None:
         f"Revenue: ${summary['revenue']:.2f}\n"
         f"Payout amount: ${summary['payout_amount']:.2f}"
     )
+    state.status = "ready_for_payout"
+    _state_store.update_state(state)
     _luffa.send_message(event.channel_id, message)
 
 
@@ -198,16 +206,21 @@ def approve_payout(event: ButtonClickEvent) -> None:
     try:
         payload = json.loads(event.payload)
         event_id = payload.get("event_id")
+        state_id = payload.get("state_id")
     except Exception as exc:
         _logger.error("Failed to parse payout payload: %s", exc)
         return
 
-    state = _state_store.get_state(event_id)
+    state = None
+    if state_id is not None:
+        state = _state_store.get_event_by_id(int(state_id))
+    if not state and event_id is not None:
+        state = _state_store.get_state(event_id)
     if not state:
         _logger.error("No state found for event_id %s", event_id)
         return
 
-    _endless.approve_payout(event_id)
+    _endless.approve_payout(state.onchain_event_id or event_id)
     state.status = "settled"
     _state_store.update_state(state)
     _luffa.send_message(event.channel_id, f"Payout approved for event *{state.title}*.")

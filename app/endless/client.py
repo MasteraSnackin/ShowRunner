@@ -109,6 +109,18 @@ class EndlessClient:
         self.logger.debug("Sales summary for event %s: %s", event_id, summary)
         return summary
 
+    def sales_summary(self, event_id: int | str) -> Dict[str, Any]:
+        """Compatibility wrapper for workflow code expecting friendlier keys."""
+        summary = self.get_sales_summary(int(event_id))
+        total_revenue = float(summary["total_revenue"])
+        payout_amount = total_revenue * 0.9
+        return {
+            "tickets_sold": summary["total_sales"],
+            "revenue": total_revenue,
+            "payout_amount": payout_amount,
+            "sales": summary["sales"],
+        }
+
     # ---------------------------------------------------------------------
     # Payout execution
     # ---------------------------------------------------------------------
@@ -118,3 +130,7 @@ class EndlessClient:
         tx_hash = f"0xdeadbeef{next(self._tx_counter):06x}"
         self.logger.info("Executed payout for event %s, tx %s", event_id, tx_hash)
         return {"transaction_hash": tx_hash}
+
+    def approve_payout(self, event_id: int | str) -> Dict[str, str]:
+        """Compatibility wrapper for workflow code."""
+        return self.execute_payouts(int(event_id))

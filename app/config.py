@@ -16,9 +16,9 @@ from typing import ClassVar
 
 class Settings(BaseSettings):
     # Core FastAPI settings
-    APP_ENV: str = Field("development", env="APP_ENV")
-    PORT: int = Field(8000, env="PORT")
-    DATABASE_URL: str = Field("sqlite:///./showrunner.db", env="DATABASE_URL")
+    APP_ENV: str = Field("development")
+    PORT: int = Field(8000)
+    DATABASE_URL: str = Field("sqlite:///./showrunner.db")
 
     # Compatibility property for legacy code expecting lowercase attribute
     @property
@@ -32,22 +32,22 @@ class Settings(BaseSettings):
         return self.DATABASE_URL
 
     # Luffa integration
-    LUFFA_API_BASE_URL: str = Field("https://dummy.luffa.api", env="LUFFA_API_BASE_URL")
-    LUFFA_API_TOKEN: str = Field("dummy-token", env="LUFFA_API_TOKEN")
+    LUFFA_API_BASE_URL: str = Field("https://dummy.luffa.api")
+    LUFFA_API_TOKEN: str = Field("dummy-token")
 
     # Endless (blockchain) integration – stubbed
-    ENDLESS_API_BASE_URL: str = Field("https://dummy.endless.api", env="ENDLESS_API_BASE_URL")
-    ENDLESS_API_TOKEN: str = Field("dummy-token", env="ENDLESS_API_TOKEN")
+    ENDLESS_API_BASE_URL: str = Field("https://dummy.endless.api")
+    ENDLESS_API_TOKEN: str = Field("dummy-token")
 
     # Civic (guardrails) integration – stubbed
-    CIVIC_API_BASE_URL: str = Field("https://dummy.civic.api", env="CIVIC_API_BASE_URL")
-    CIVIC_API_TOKEN: str = Field("dummy-token", env="CIVIC_API_TOKEN")
+    CIVIC_API_BASE_URL: str = Field("https://dummy.civic.api")
+    CIVIC_API_TOKEN: str = Field("dummy-token")
 
     # LLM integration – stubbed
-    LLM_API_BASE_URL: str = Field("https://dummy.llm.api", env="LLM_API_BASE_URL")
-    SECRET_KEY: str = Field("dummy-secret-key", env="SECRET_KEY")
-    OPENAI_API_KEY: str = Field("dummy-openai-key", env="OPENAI_API_KEY")
-    OPENAI_MODEL: str = Field("gpt-4o-mini", env="OPENAI_MODEL")
+    LLM_API_BASE_URL: str = Field("https://dummy.llm.api")
+    SECRET_KEY: str = Field("dummy-secret-key")
+    OPENAI_API_KEY: str = Field("dummy-openai-key")
+    OPENAI_MODEL: str = Field("gpt-4o-mini")
 
     # Compatibility properties for legacy attribute names expected by other modules
     @property
@@ -107,10 +107,10 @@ class Settings(BaseSettings):
         return self.LLM_API_BASE_URL
 
     # Payout configuration
-    ORGANISER_ADDRESS: str = Field("0xOrganizerDummy", env="ORGANISER_ADDRESS")
-    TREASURY_ADDRESS: str = Field("0xTreasuryDummy", env="TREASURY_ADDRESS")
-    ORGANISER_SHARE: float = Field(0.9, env="ORGANISER_SHARE")
-    TREASURY_SHARE: float = Field(0.1, env="TREASURY_SHARE")
+    ORGANISER_ADDRESS: str = Field("0xOrganizerDummy")
+    TREASURY_ADDRESS: str = Field("0xTreasuryDummy")
+    ORGANISER_SHARE: float = Field(0.9)
+    TREASURY_SHARE: float = Field(0.1)
 
     # Allow overriding the .env path via ENV_PATH environment variable for flexibility in different deployment scenarios.
     ENV_PATH: ClassVar[pathlib.Path] = pathlib.Path(os.getenv("ENV_PATH", pathlib.Path(__file__).resolve().parents[1] / "showrunner" / ".env"))

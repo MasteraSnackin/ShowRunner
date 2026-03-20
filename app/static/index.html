@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Encode ShowRunner Dashboard</title>
+    <link rel="stylesheet" href="/static/dashboard.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="sidebar glass">
+        <div class="brand-mark">
+          <span class="brand-kicker">Encode AI London</span>
+          <h1>ShowRunner</h1>
+          <p>Live event orchestration for creation, settlement, and payout.</p>
+        </div>
+        <nav class="sidebar-groups">
+          <button class="nav-pill is-active" type="button">Mission Control</button>
+          <button class="nav-pill" type="button" id="openComposer">New Event</button>
+          <button class="nav-pill" type="button" id="seedEvent">Generate Sample</button>
+        </nav>
+        <section class="sidebar-note">
+          <h2>Audit targets</h2>
+          <p>Immediate feedback, calm navigation, and transparent system state.</p>
+        </section>
+      </aside>
+
+      <main class="dashboard">
+        <section class="hero glass">
+          <div>
+            <span class="eyebrow">Responsible App Surface</span>
+            <h2>Event operations in one calm, high-signal view.</h2>
+            <p>
+              Create a launch, simulate sales, settle revenue, and approve payout
+              without dropping into raw webhook payloads.
+            </p>
+          </div>
+          <div class="hero-actions">
+            <button class="primary-button" type="button" id="heroCreate">
+              Create Event
+            </button>
+            <button class="secondary-button" type="button" id="heroRefresh">
+              Refresh Feed
+            </button>
+          </div>
+        </section>
+
+        <section class="stats-grid">
+          <article class="stat-card glass">
+            <span>Total events</span>
+            <strong id="totalCount">0</strong>
+          </article>
+          <article class="stat-card glass">
+            <span>Open now</span>
+            <strong id="openCount">0</strong>
+          </article>
+          <article class="stat-card glass">
+            <span>Ready for payout</span>
+            <strong id="readyCount">0</strong>
+          </article>
+          <article class="stat-card glass">
+            <span>Settled</span>
+            <strong id="settledCount">0</strong>
+          </article>
+        </section>
+
+        <section class="content-grid">
+          <section class="event-stage glass">
+            <div class="section-head">
+              <div>
+                <span class="eyebrow">Event board</span>
+                <h3>Lifecycle watch</h3>
+              </div>
+              <div class="status-inline" id="statusBanner">Loading dashboard</div>
+            </div>
+            <div class="skeleton-grid" id="skeletonGrid" aria-hidden="true">
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
+            </div>
+            <div class="empty-state hidden" id="emptyState">
+              <h4>No events yet</h4>
+              <p>Create your first demo event to preview the full orchestration loop.</p>
+              <button class="primary-button" type="button" id="emptyCreate">
+                Start with a live sample
+              </button>
+            </div>
+            <div class="event-grid hidden" id="eventGrid"></div>
+            <div class="error-state hidden" id="errorState" role="alert">
+              <strong>Dashboard unavailable.</strong>
+              <p id="errorMessage">Something went wrong while loading the event board.</p>
+              <button class="secondary-button" type="button" id="retryLoad">Try again</button>
+            </div>
+          </section>
+
+          <section class="playbook glass">
+            <div class="section-head">
+              <div>
+                <span class="eyebrow">System states</span>
+                <h3>What this demo proves</h3>
+              </div>
+            </div>
+            <ul class="playbook-list">
+              <li>Loading skeletons show while the board is fetching.</li>
+              <li>Success and error toasts narrate every mutation.</li>
+              <li>Payout requires a confirmation dialog before execution.</li>
+              <li>Sales and settlement actions update cards optimistically.</li>
+            </ul>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <section class="composer glass hidden" id="composerPanel">
+      <div class="composer-head">
+        <div>
+          <span class="eyebrow">Quick create</span>
+          <h3>Stage a new event</h3>
+        </div>
+        <button class="icon-button" type="button" id="closeComposer" aria-label="Close">
+          ×
+        </button>
+      </div>
+      <form id="composerForm">
+        <label>
+          Title
+          <input name="title" maxlength="80" value="Encode Rooftop Showcase" required />
+        </label>
+        <label>
+          Description
+          <textarea name="description" maxlength="180" required>Sunset demos, founder lightning talks, and a token-gated afterparty.</textarea>
+        </label>
+        <label>
+          Channel
+          <input name="channel_id" maxlength="40" value="demo-room" required />
+        </label>
+        <button class="primary-button wide" type="submit">Launch event</button>
+      </form>
+    </section>
+
+    <dialog class="confirm-dialog" id="confirmDialog">
+      <form method="dialog" class="confirm-card">
+        <span class="eyebrow">High-commitment action</span>
+        <h3>Approve payout?</h3>
+        <p>This moves the event into the settled state and is intended to feel deliberate.</p>
+        <div class="dialog-actions">
+          <button class="secondary-button" value="cancel">Cancel</button>
+          <button class="primary-button" id="confirmPayoutButton" value="confirm">
+            Approve payout
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+    <script type="module" src="/static/dashboard.js"></script>
+  </body>
+  </html>

@@ -90,9 +90,10 @@ class StateStore:
         """
         with self._session() as session:
             result = session.execute(
-                select(EventModel).where(EventModel.onchain_event_id == event_id)
-            ).scalar_one_or_none()
-            # ``result`` is an ``EventModel`` instance or ``None``
+                select(EventModel)
+                .where(EventModel.onchain_event_id == str(event_id))
+                .order_by(EventModel.id.desc())
+            ).scalars().first()
             return result.to_state() if result else None
 
     # ---------------------------------------------------------------------
@@ -148,6 +149,12 @@ class StateStore:
                 query = query.filter(EventModel.status == status)
             model = query.order_by(EventModel.id.desc()).first()
             return model.to_state() if model else None
+
+    def list_events(self, limit: int = 24) -> List[EventState]:
+        """Return recent events ordered newest-first."""
+        with self._session() as db:
+            models = db.query(EventModel).order_by(EventModel.id.desc()).limit(limit).all()
+            return [model.to_state() for model in models]
 
     def update_event(self, state: EventState) -> EventState:
         """Update an existing event identified by ``state.id``.
