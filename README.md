@@ -11,7 +11,7 @@
 ---
 
 ## Description
-Encode ShowRunner is a lightweight **AI‑driven event orchestration bot** that integrates with the **Luffa** messaging platform, the **Endless** on‑chain ticketing system, and **Civic** guardrails. It listens for Luffa webhook events, routes them through orchestrated workflows, and manages the full lifecycle of an event: creation, settlement, and payout. All state is persisted in a local SQLite database via SQLAlchemy, and a stubbed LLM client provides placeholder content generation.
+Encode ShowRunner is a lightweight **AI‑driven event orchestration bot** that integrates with the **Luffa** messaging platform, the **Endless** on-chain ticketing system, and **Civic** guardrails. It listens for Luffa webhook events, routes them through orchestrated workflows, and manages the full lifecycle of an event: creation, settlement, and payout. All state is persisted in SQLite via SQLAlchemy, and the app now includes a browser-based operations dashboard for creating events, simulating sales, settling revenue, and approving payouts.
 
 ---
 
@@ -34,8 +34,9 @@ Encode ShowRunner is a lightweight **AI‑driven event orchestration bot** that 
 
 ## Features
 - **Webhook listener** for Luffa events (commands, button clicks)
+- **Operations dashboard** for running the event lifecycle in a browser
 - **Event creation workflow** – generates title, description, banner, on‑chain event, and interactive card
-- **Settlement workflow** – opens ticket sales and updates UI with “Approve Payout” button
+- **Settlement workflow** – computes sales, moves events into a payout-ready state, and updates the UI
 - **Payout workflow** – distributes proceeds between organiser and treasury
 - **SQLite persistence** via SQLAlchemy
 - **Stubbed LLM client** for content generation (easy to replace with a real model)
@@ -58,7 +59,9 @@ Encode ShowRunner is a lightweight **AI‑driven event orchestration bot** that 
 ## Architecture Overview
 ```mermaid
 flowchart LR
-    User[User] -->|HTTP request| API[FastAPI Backend]
+    User[User] -->|Browser or webhook| API[FastAPI Backend]
+    User -->|Dashboard actions| UI[Ops Dashboard]
+    UI --> API
     API --> DB[(SQLite DB)]
     API --> Luffa[External Luffa Service]
     API --> Endless[External Endless Service]
@@ -68,7 +71,7 @@ flowchart LR
     Endless -->|On‑chain events| API
     Civic -->|Guardrail checks| API
 ```
-*The diagram shows the core FastAPI backend handling HTTP/webhook traffic, persisting state in SQLite, and communicating with external services (Luffa, Endless, Civic) as well as a stubbed LLM client for content generation.*
+*The dashboard and webhook routes both flow through the same FastAPI backend. The backend persists event state in SQLite and coordinates the stubbed Luffa, Endless, Civic, and LLM integrations so the full event lifecycle can be exercised locally.*
 
 ---
 
@@ -93,7 +96,8 @@ flowchart LR
    ```bash
    uvicorn app.main:app --reload --port 8000
    ```
-   Health endpoint: `GET http://localhost:8000/` returns `{"message": "ShowRunner API is running"}`.
+   Dashboard: `http://localhost:8000/dashboard`
+   Health endpoint: `GET http://localhost:8000/api/health` returns `{"message": "ShowRunner API is running"}`.
 
 ---
 
@@ -102,6 +106,13 @@ flowchart LR
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
+
+### Open the dashboard
+Visit `http://localhost:8000/dashboard` to:
+- create demo events
+- simulate ticket sales
+- trigger settlement
+- approve payout with a confirmation dialog
 
 ### Send a sample webhook (create event)
 ```bash
@@ -124,23 +135,32 @@ All configurable values are loaded from a `.env` file via **pydantic‑settings*
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | SQLite connection string (default `sqlite:///showrunner.db`) |
-| `LUFFA_TOKEN` | API token for Luffa integration |
-| `ENDLESS_API_KEY` | API key for Endless on‑chain client |
-| `CIVIC_API_KEY` | API key for Civic guardrails |
-| `LLM_ENDPOINT` | URL for the LLM service (stubbed by default) |
-| `LOG_LEVEL` | Logging verbosity (`INFO`, `DEBUG`, etc.) |
+| `LUFFA_API_BASE_URL` | Base URL for the Luffa integration |
+| `LUFFA_API_TOKEN` | API token for Luffa integration |
+| `ENDLESS_API_BASE_URL` | Base URL for the Endless client |
+| `ENDLESS_API_TOKEN` | API token for the Endless client |
+| `CIVIC_API_BASE_URL` | Base URL for Civic guardrails |
+| `CIVIC_API_TOKEN` | API token for Civic guardrails |
+| `OPENAI_API_KEY` | API key for the optional OpenAI-backed LLM client |
+| `OPENAI_MODEL` | Model name used for description generation |
 
 ---
 
 ## Screenshots / Demo
-*Placeholder – add screenshots of the bot card UI or a link to a live demo.*
+*Placeholder – add screenshots of the operations dashboard and lifecycle cards, or link to a hosted demo.*
 
 ---
 
 ## API Reference
-- **GET /** – Health check (`{"message": "ShowRunner API is running"}`)
+- **GET /** – Returns the HTML dashboard for browsers and JSON health for API clients
+- **GET /dashboard** – Serves the operations dashboard
+- **GET /api/health** – JSON health check
+- **GET /api/events** – Returns recent event state and dashboard summary counts
+- **POST /api/demo/events** – Creates a demo event from form input
+- **POST /api/demo/events/{state_id}/sales** – Records simulated ticket sales
+- **POST /api/demo/events/{state_id}/settle** – Runs settlement for an event
+- **POST /api/demo/events/{state_id}/payout** – Approves payout for an event
 - **POST /webhook** – Accepts Luffa webhook payloads (command, button click, etc.)
-- **POST /admin/reload** – (Future) endpoint to reload configuration without restart
 
 ---
 
@@ -149,6 +169,7 @@ The project uses **pytest**. Run the test suite with:
 ```bash
 pytest
 ```
+Tests automatically use an isolated temporary SQLite database so local development data is not mutated during a test run.
 
 ---
 
