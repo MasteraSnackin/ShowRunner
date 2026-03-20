@@ -138,3 +138,100 @@ def test_demo_api_flow_via_http_routes():
     payload = json.loads(body)
     matching = next(event for event in payload["events"] if event["id"] == created["id"])
     assert matching["status"] == "settled"
+
+
+def test_webhook_rejects_invalid_json_with_structured_400():
+    status, headers, body = asyncio.run(
+        asgi_request(
+            "POST",
+            "/webhook",
+            headers={"content-type": "application/json"},
+            body=b"{bad json",
+        )
+    )
+
+    payload = json.loads(body)
+    assert status == 400
+    assert headers["content-type"].startswith("application/json")
+    assert payload["error"]["code"] == "bad_request"
+    assert payload["error"]["message"] == "Webhook payload must be valid JSON"
+
+
+def test_payout_rejects_invalid_transition_with_conflict():
+    create_payload = json.dumps(
+        {
+            "title": "Transition Guard Event",
+            "description": "Used to verify payout validation.",
+            "channel_id": "route-invalid-transition",
+        }
+    ).encode()
+
+    status, _, body = asyncio.run(
+        asgi_request(
+            "POST",
+            "/api/demo/events",
+            headers={"content-type": "application/json"},
+            body=create_payload,
+        )
+    )
+    created = json.loads(body)
+    assert status == 200
+
+    status, headers, body = asyncio.run(
+        asgi_request("POST", f"/api/demo/events/{created['id']}/payout")
+    )
+    payload = json.loads(body)
+    assert status == 409
+    assert headers["content-type"].startswith("application/json")
+    assert payload["error"]["code"] == "conflict"
+    assert payload["error"]["details"]["status"] == "open"
+
+
+def test_sales_reject_after_event_is_settled():
+    create_payload = json.dumps(
+        {
+            "title": "Settled Guard Event",
+            "description": "Used to verify sales validation after settlement.",
+            "channel_id": "route-sales-after-settled",
+        }
+    ).encode()
+
+    status, _, body = asyncio.run(
+        asgi_request(
+            "POST",
+            "/api/demo/events",
+            headers={"content-type": "application/json"},
+            body=create_payload,
+        )
+    )
+    created = json.loads(body)
+    assert status == 200
+
+    sale_payload = json.dumps({"quantity": 1}).encode()
+    status, _, _ = asyncio.run(
+        asgi_request(
+            "POST",
+            f"/api/demo/events/{created['id']}/sales",
+            headers={"content-type": "application/json"},
+            body=sale_payload,
+        )
+    )
+    assert status == 200
+
+    status, _, _ = asyncio.run(
+        asgi_request("POST", f"/api/demo/events/{created['id']}/settle")
+    )
+    assert status == 200
+
+    status, _, body = asyncio.run(
+        asgi_request(
+            "POST",
+            f"/api/demo/events/{created['id']}/sales",
+            headers={"content-type": "application/json"},
+            body=sale_payload,
+        )
+    )
+    payload = json.loads(body)
+    assert status == 409
+    assert payload["error"]["code"] == "conflict"
+    assert payload["error"]["details"]["status"] == "ready_for_payout"

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from .agent.orchestrator import handle_event
 from .agent.tools import get_endless_client, get_state_store
+from .errors import ApplicationError, BadRequestError, ConflictError, NotFoundError
 from .state_store import EventState
 
 app = FastAPI(title="Encode ShowRunner")
@@ -31,6 +32,22 @@ class RecordSaleRequest(BaseModel):
     quantity: int = Field(default=1, ge=1, le=25)
 
 
+@app.exception_handler(ApplicationError)
+async def application_error_handler(
+    request: Request, exc: ApplicationError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "details": exc.details,
+            }
+        },
+    )
+
+
 def serialize_event(state: EventState) -> dict[str, object]:
     return {
         "id": state.id,
@@ -43,7 +60,7 @@ def serialize_event(state: EventState) -> dict[str, object]:
         "supply": state.supply,
         "onchain_event_id": state.onchain_event_id,
         "actions": {
-            "can_record_sale": state.status in {"open", "ready_for_payout"},
+            "can_record_sale": state.status == "open",
             "can_settle": state.status == "open",
             "can_payout": state.status == "ready_for_payout",
         },
@@ -65,7 +82,10 @@ def build_dashboard_payload() -> dict[str, object]:
 def require_event(state_id: int) -> EventState:
     state = get_state_store().get_event_by_id(state_id)
     if not state:
-        raise HTTPException(status_code=404, detail=f"Event {state_id} not found")
+        raise NotFoundError(
+            f"Event {state_id} not found",
+            details={"state_id": state_id},
+        )
     return state
 
 
@@ -91,7 +111,15 @@ def create_demo_event(data: CreateEventRequest) -> dict[str, object]:
 def record_demo_sale(state_id: int, data: RecordSaleRequest) -> dict[str, object]:
     state = require_event(state_id)
     if not state.onchain_event_id:
-        raise HTTPException(status_code=409, detail="Event is missing an on-chain identifier")
+        raise ConflictError(
+            "Event is missing an on-chain identifier",
+            details={"state_id": state_id},
+        )
+    if state.status != "open":
+        raise ConflictError(
+            f"Cannot record sales for an event in '{state.status}' state",
+            details={"state_id": state_id, "status": state.status},
+        )
     get_endless_client().record_sale(int(state.onchain_event_id), "dashboard-buyer", data.quantity)
     return serialize_event(state)
 
@@ -99,7 +127,15 @@ def record_demo_sale(state_id: int, data: RecordSaleRequest) -> dict[str, object
 def settle_demo_event(state_id: int) -> dict[str, object]:
     state = require_event(state_id)
     if not state.onchain_event_id:
-        raise HTTPException(status_code=409, detail="Event is missing an on-chain identifier")
+        raise ConflictError(
+            "Event is missing an on-chain identifier",
+            details={"state_id": state_id},
+        )
+    if state.status != "open":
+        raise ConflictError(
+            f"Only open events can be settled; current state is '{state.status}'",
+            details={"state_id": state_id, "status": state.status},
+        )
     handle_event(
         {
             "type": "button_click",
@@ -122,7 +158,15 @@ def settle_demo_event(state_id: int) -> dict[str, object]:
 def approve_demo_payout(state_id: int) -> dict[str, object]:
     state = require_event(state_id)
     if not state.onchain_event_id:
-        raise HTTPException(status_code=409, detail="Event is missing an on-chain identifier")
+        raise ConflictError(
+            "Event is missing an on-chain identifier",
+            details={"state_id": state_id},
+        )
+    if state.status != "ready_for_payout":
+        raise ConflictError(
+            f"Only payout-ready events can be approved; current state is '{state.status}'",
+            details={"state_id": state_id, "status": state.status},
+        )
     handle_event(
         {
             "type": "button_click",
@@ -189,8 +233,14 @@ async def post_payout(state_id: int) -> dict[str, object]:
 
 @app.post("/webhook")
 async def webhook(request: Request) -> dict[str, str]:
-    payload = await request.json()
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError as exc:
+        raise BadRequestError(
+            "Webhook payload must be valid JSON",
+            details={"error": str(exc)},
+        ) from exc
     if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="Webhook payload must be a JSON object")
+        raise BadRequestError("Webhook payload must be a JSON object")
     handle_event(payload)
     return {"status": "accepted"}
