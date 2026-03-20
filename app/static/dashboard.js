@@ -51,6 +51,20 @@ function updateBanner(message) {
   elements.statusBanner.textContent = message;
 }
 
+function formatStatusLabel(status) {
+  return status.replaceAll("_", " ");
+}
+
+function statusNote(status) {
+  if (status === "open") {
+    return "Accepting sales and ready for settlement.";
+  }
+  if (status === "ready_for_payout") {
+    return "Settlement prepared. Waiting for payout approval.";
+  }
+  return "Payout approved and lifecycle closed.";
+}
+
 function setOptimisticStatus(eventId, status) {
   state.events = state.events.map((event) =>
     event.id === eventId
@@ -87,6 +101,7 @@ function renderEvents() {
     const card = document.createElement("article");
     card.className = "event-card";
     const actionButtons = [];
+    const label = formatStatusLabel(event.status);
 
     actionButtons.push(`
       <button class="action-button add-sale-button" data-event-id="${event.id}" ${
@@ -113,11 +128,23 @@ function renderEvents() {
     `);
 
     card.innerHTML = `
-      <div class="event-banner" style="background-image: linear-gradient(180deg, rgba(16, 23, 22, 0.08), rgba(16, 23, 22, 0.5)), linear-gradient(135deg, rgba(31, 92, 87, 0.78), rgba(221, 108, 66, 0.88)), url('${event.banner_url}')">
-        <div class="event-title">${event.title}</div>
+      <div class="event-card-top">
+        <div>
+          <div class="card-kicker">Channel ${event.channel_id}</div>
+          <div class="card-stage-note">${statusNote(event.status)}</div>
+        </div>
+        <div class="status-chip status-${event.status}">${label}</div>
       </div>
-      <div class="status-chip status-${event.status}">${event.status.replaceAll("_", " ")}</div>
-      <div>${event.description}</div>
+      <div class="event-banner" style="background-image: linear-gradient(180deg, rgba(16, 23, 22, 0.06), rgba(16, 23, 22, 0.58)), linear-gradient(135deg, rgba(28, 91, 85, 0.8), rgba(218, 107, 62, 0.88)), url('${event.banner_url}')">
+        <div class="event-banner-inner">
+          <div class="event-banner-meta">
+            <span class="banner-chip">Event #${event.id}</span>
+            <span class="banner-chip">Chain ${event.onchain_event_id ?? "n/a"}</span>
+          </div>
+          <div class="event-title">${event.title}</div>
+        </div>
+      </div>
+      <div class="event-description">${event.description}</div>
       <div class="metric-row">
         <div class="metric-pill"><span>Price</span><strong>$${Number(event.price).toFixed(2)}</strong></div>
         <div class="metric-pill"><span>Supply</span><strong>${event.supply}</strong></div>
@@ -133,7 +160,10 @@ function renderEvents() {
           <button class="primary-button confirm-sale" data-event-id="${event.id}" type="button">Record</button>
         </div>
       </div>
-      <div class="card-actions">${actionButtons.join("")}</div>
+      <div class="action-strip">
+        <div class="action-strip-title">Available actions</div>
+        <div class="card-actions">${actionButtons.join("")}</div>
+      </div>
     `;
 
     elements.eventGrid.appendChild(card);
