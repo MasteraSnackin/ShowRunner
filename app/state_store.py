@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, List
 
-from sqlalchemy import Column, Integer, String, Float, create_engine, select, func
+from sqlalchemy import Column, Index, Integer, String, Float, create_engine, select, func
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 # ---------------------------------------------------------------------------
@@ -23,6 +23,12 @@ Base = declarative_base()
 
 class EventModel(Base):
     __tablename__ = "events"
+    __table_args__ = (
+        Index("ix_events_channel_id_id", "channel_id", "id"),
+        Index("ix_events_channel_status_id", "channel_id", "status", "id"),
+        Index("ix_events_onchain_event_id_id", "onchain_event_id", "id"),
+        Index("ix_events_status", "status"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     channel_id = Column(String, nullable=False)
