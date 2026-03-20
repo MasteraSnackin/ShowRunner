@@ -70,12 +70,7 @@ def serialize_event(state: EventState) -> dict[str, object]:
 def build_dashboard_payload() -> dict[str, object]:
     store = get_state_store()
     events = [serialize_event(event) for event in store.list_events()]
-    counts = {
-        "total": len(events),
-        "open": sum(1 for event in events if event["status"] == "open"),
-        "ready_for_payout": sum(1 for event in events if event["status"] == "ready_for_payout"),
-        "settled": sum(1 for event in events if event["status"] == "settled"),
-    }
+    counts = store.get_event_counts()
     return {"events": events, "counts": counts}
 
 
@@ -204,9 +199,8 @@ def approve_demo_payout(state_id: int) -> dict[str, object]:
 
 
 def reset_demo_workspace() -> dict[str, object]:
-    existing = get_state_store().list_events(limit=1000)
-    deleted_count = len(existing)
-    reset_demo_runtime()
+    deleted_count = get_state_store().delete_all_events()
+    get_endless_client().reset_demo_state()
     return {
         "status": "reset",
         "deleted_events": deleted_count,

@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, List
 
-from sqlalchemy import Column, Integer, String, Float, create_engine, select
+from sqlalchemy import Column, Integer, String, Float, create_engine, select, func
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 # ---------------------------------------------------------------------------
@@ -155,6 +155,22 @@ class StateStore:
         with self._session() as db:
             models = db.query(EventModel).order_by(EventModel.id.desc()).limit(limit).all()
             return [model.to_state() for model in models]
+
+    def get_event_counts(self) -> dict[str, int]:
+        """Return exact event counts grouped by lifecycle state."""
+        with self._session() as db:
+            rows = db.query(EventModel.status, func.count(EventModel.id)).group_by(EventModel.status).all()
+            counts = {
+                "total": 0,
+                "open": 0,
+                "ready_for_payout": 0,
+                "settled": 0,
+            }
+            for status, count in rows:
+                counts["total"] += int(count)
+                if status in counts:
+                    counts[status] = int(count)
+            return counts
 
     def delete_all_events(self) -> int:
         """Delete all persisted events and return the number removed."""

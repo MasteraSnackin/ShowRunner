@@ -4,6 +4,8 @@ import asyncio
 import json
 
 from app.main import app
+from app.agent.tools import get_state_store, reset_demo_runtime
+from app.state_store import EventState
 
 
 async def asgi_request(
@@ -290,3 +292,56 @@ def test_demo_reset_clears_persisted_events():
     missing = json.loads(body)
     assert status == 404
     assert missing["error"]["code"] == "not_found"
+
+
+def test_dashboard_counts_are_not_limited_to_visible_event_page():
+    reset_demo_runtime()
+    store = get_state_store()
+    for index in range(30):
+        store.create_event(
+            EventState(
+                channel_id="count-check",
+                status="open" if index % 2 == 0 else "settled",
+                title=f"Count Event {index}",
+                description="Count validation seed",
+                banner_url="https://placehold.co/600x300",
+                price=10.0,
+                supply=100,
+                onchain_event_id=str(index + 1),
+            )
+        )
+
+    status, _, body = asyncio.run(asgi_request("GET", "/api/events"))
+    payload = json.loads(body)
+
+    assert status == 200
+    assert len(payload["events"]) == 24
+    assert payload["counts"]["total"] == 30
+    assert payload["counts"]["open"] == 15
+    assert payload["counts"]["settled"] == 15
+
+    asyncio.run(asgi_request("POST", "/api/demo/reset"))
+
+
+def test_demo_reset_reports_exact_deleted_count_beyond_list_limit():
+    reset_demo_runtime()
+    store = get_state_store()
+    for index in range(1005):
+        store.create_event(
+            EventState(
+                channel_id="reset-count-check",
+                status="open",
+                title=f"Reset Event {index}",
+                description="Reset validation seed",
+                banner_url="https://placehold.co/600x300",
+                price=10.0,
+                supply=100,
+                onchain_event_id=str(index + 1),
+            )
+        )
+
+    status, _, body = asyncio.run(asgi_request("POST", "/api/demo/reset"))
+    payload = json.loads(body)
+
+    assert status == 200
+    assert payload["deleted_events"] == 1005
