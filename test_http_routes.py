@@ -1,0 +1,140 @@
+from __future__ import annotations
+
+import asyncio
+import json
+
+from app.main import app
+
+
+async def asgi_request(
+    method: str,
+    path: str,
+    *,
+    headers: dict[str, str] | None = None,
+    body: bytes = b"",
+) -> tuple[int, dict[str, str], bytes]:
+    response_status = 500
+    response_headers: dict[str, str] = {}
+    body_parts: list[bytes] = []
+    request_complete = False
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": method,
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "headers": [
+            (key.lower().encode("latin-1"), value.encode("latin-1"))
+            for key, value in (headers or {}).items()
+        ],
+        "client": ("testclient", 123),
+        "server": ("testserver", 80),
+    }
+
+    async def receive() -> dict[str, object]:
+        nonlocal request_complete
+        if request_complete:
+            return {"type": "http.disconnect"}
+        request_complete = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message: dict[str, object]) -> None:
+        nonlocal response_status, response_headers
+        if message["type"] == "http.response.start":
+            response_status = int(message["status"])
+            response_headers = {
+                key.decode("latin-1"): value.decode("latin-1")
+                for key, value in message["headers"]
+            }
+        elif message["type"] == "http.response.body":
+            body_parts.append(message.get("body", b""))
+
+    await app(scope, receive, send)
+    return response_status, response_headers, b"".join(body_parts)
+
+
+def test_health_route_returns_json():
+    status, headers, body = asyncio.run(asgi_request("GET", "/api/health"))
+
+    assert status == 200
+    assert headers["content-type"].startswith("application/json")
+    assert json.loads(body) == {"message": "ShowRunner API is running"}
+
+
+def test_dashboard_root_serves_html_for_browser_requests():
+    status, headers, body = asyncio.run(
+        asgi_request("GET", "/", headers={"accept": "text/html"})
+    )
+
+    assert status == 200
+    assert headers["content-type"].startswith("text/html")
+    assert b"Encode ShowRunner Dashboard" in body
+
+
+def test_head_root_returns_ok_without_body():
+    status, headers, body = asyncio.run(asgi_request("HEAD", "/"))
+
+    assert status == 200
+    assert body == b""
+    assert "content-type" not in headers or headers["content-type"] in {
+        "",
+        "application/json",
+    }
+
+
+def test_demo_api_flow_via_http_routes():
+    create_payload = json.dumps(
+        {
+            "title": "Route Test Event",
+            "description": "Exercise the dashboard endpoints end to end.",
+            "channel_id": "route-http-flow",
+        }
+    ).encode()
+
+    status, _, body = asyncio.run(
+        asgi_request(
+            "POST",
+            "/api/demo/events",
+            headers={"content-type": "application/json"},
+            body=create_payload,
+        )
+    )
+    created = json.loads(body)
+
+    assert status == 200
+    assert created["title"] == "Route Test Event"
+    assert created["status"] == "open"
+
+    sale_payload = json.dumps({"quantity": 2}).encode()
+    status, _, _ = asyncio.run(
+        asgi_request(
+            "POST",
+            f"/api/demo/events/{created['id']}/sales",
+            headers={"content-type": "application/json"},
+            body=sale_payload,
+        )
+    )
+    assert status == 200
+
+    status, _, body = asyncio.run(
+        asgi_request("POST", f"/api/demo/events/{created['id']}/settle")
+    )
+    settled = json.loads(body)
+    assert status == 200
+    assert settled["status"] == "ready_for_payout"
+
+    status, _, body = asyncio.run(
+        asgi_request("POST", f"/api/demo/events/{created['id']}/payout")
+    )
+    paid = json.loads(body)
+    assert status == 200
+    assert paid["status"] == "settled"
+
+    status, _, body = asyncio.run(asgi_request("GET", "/api/events"))
+    payload = json.loads(body)
+    matching = next(event for event in payload["events"] if event["id"] == created["id"])
+    assert matching["status"] == "settled"
