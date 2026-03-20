@@ -20,10 +20,10 @@ from ..civic.client import CivicClient
 # Singletons – in a real app you might use a container or FastAPI Depends.
 _logger = get_logger(__name__)
 _settings = Settings()  # reads from .env or defaults
-_state_store = StateStore(database_url=_settings.database_url)
-_luffa_client = LuffaClient(base_url=_settings.luffa_base_url, api_key=_settings.luffa_api_key)
-_llm_client = LLMClient()
-_endless_client = EndlessClient()
+_state_store = StateStore(db_url=_settings.database_url)
+_luffa_client = LuffaClient(settings=_settings)
+_llm_client = LLMClient(settings=_settings)
+_endless_client = EndlessClient(settings=_settings)
 _civic_client = CivicClient()
 
 

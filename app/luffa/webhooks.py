@@ -35,6 +35,7 @@ class MessageCommandEvent(LuffaEvent):
 @dataclass
 class ButtonClickEvent(LuffaEvent):
     button_id: str  # e.g. "event:approve_payout:1"
+    payload: str  # JSON string payload from the button click
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +89,7 @@ def parse_incoming(body: str | bytes | Dict[str, Any]) -> Optional[LuffaEvent]:
         )
     elif event_type == "button_click":
         button_id = _get_str(payload, "button_id")
+        payload_str = _get_str(payload, "payload")
         if not button_id:
             return None
         return ButtonClickEvent(
@@ -95,6 +97,7 @@ def parse_incoming(body: str | bytes | Dict[str, Any]) -> Optional[LuffaEvent]:
             user_id=user_id,
             raw=payload,
             button_id=button_id,
+            payload=payload_str or "{}",
         )
     # Unsupported event type
     return None

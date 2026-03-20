@@ -88,7 +88,7 @@ def start_event_creation(event: MessageCommandEvent) -> None:
 
     # Generate richer description and image via LLM stub
     description = _llm.generate_description(title, short_desc)
-    image_url = _llm.generate_image_url(title)
+    image_url = _llm.generate_image_url({"title": title, "description": short_desc})
 
     # Create ticket type on Endless (stubbed)
     ticket = _endless.create_ticket_type(
@@ -99,6 +99,16 @@ def start_event_creation(event: MessageCommandEvent) -> None:
         supply=100,
         image_url=image_url,
     )
+    # ``ticket`` may be a dict with details or an int representing the onchain_event_id.
+    if isinstance(ticket, dict):
+        price = ticket.get("price", 10.0)
+        supply = ticket.get("supply", 100)
+        onchain_event_id = ticket.get("event_id", event.channel_id)
+    else:
+        # Assume ticket is the onchain_event_id (int)
+        price = 10.0
+        supply = 100
+        onchain_event_id = ticket
 
     # Persist state
     state = EventState(
@@ -107,11 +117,11 @@ def start_event_creation(event: MessageCommandEvent) -> None:
         title=title,
         description=description,
         banner_url=image_url,
-        price=ticket["price"],
-        supply=ticket["supply"],
-        onchain_event_id=ticket["event_id"],
+        price=price,
+        supply=supply,
+        onchain_event_id=onchain_event_id,
     )
-    state_store.create_state(state)
+    _state_store.create_state(state)
 
     # Send confirmation back to Luffa
     confirmation = (
@@ -148,7 +158,7 @@ def start_settlement(event: ButtonClickEvent) -> None:
         _logger.error("Failed to parse settlement payload: %s", exc)
         return
 
-    state = state_store.get_state(event_id)
+    state = _state_store.get_state(event_id)
     if not state:
         _logger.error("No state found for event_id %s", event_id)
         return
@@ -192,12 +202,12 @@ def approve_payout(event: ButtonClickEvent) -> None:
         _logger.error("Failed to parse payout payload: %s", exc)
         return
 
-    state = state_store.get_state(event_id)
+    state = _state_store.get_state(event_id)
     if not state:
         _logger.error("No state found for event_id %s", event_id)
         return
 
     _endless.approve_payout(event_id)
     state.status = "settled"
-    state_store.update_state(state)
+    _state_store.update_state(state)
     _luffa.send_message(event.channel_id, f"Payout approved for event *{state.title}*.")

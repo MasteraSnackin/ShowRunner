@@ -1,0 +1,10 @@
+# Ignore environment files
+.env
+showrunner/.env
+# Python
+__pycache__/
+*.pyc
+# VS Code
+.vscode/
+# macOS
+.DS_Store

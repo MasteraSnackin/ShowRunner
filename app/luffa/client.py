@@ -34,20 +34,24 @@ class LuffaClient:
             "Content-Type": "application/json",
         })
 
+    class LuffaRequestError(RuntimeError):
+        """Exception raised when a Luffa HTTP request fails."""
+        pass
+
     def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.base_url}/{path.lstrip('/')}"
         self.logger.debug("POST %s payload=%s", url, payload)
-        response = self.session.post(url, json=payload)
         try:
+            response = self.session.post(url, json=payload)
             response.raise_for_status()
-        except requests.HTTPError as exc:
-            self.logger.error("Luffa request failed: %s – %s", exc, response.text)
-            raise
+        except requests.RequestException as exc:
+            self.logger.error("Luffa request failed: %s", exc)
+            raise LuffaRequestError(str(exc)) from exc
         try:
             data = response.json()
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
             self.logger.error("Luffa response not JSON: %s", response.text)
-            raise
+            raise LuffaRequestError("Invalid JSON response") from exc
         self.logger.debug("Luffa response: %s", data)
         return data
 

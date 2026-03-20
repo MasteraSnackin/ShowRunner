@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, List
 
-from sqlalchemy import Column, Integer, String, Float, create_engine
+from sqlalchemy import Column, Integer, String, Float, create_engine, select
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 # ---------------------------------------------------------------------------
@@ -53,7 +53,6 @@ class EventModel(Base):
 # ---------------------------------------------------------------------------
 @dataclass
 class EventState:
-    id: Optional[int]
     channel_id: str
     status: str
     title: str
@@ -61,6 +60,7 @@ class EventState:
     banner_url: str
     price: float
     supply: int
+    id: Optional[int] = None
     onchain_event_id: Optional[str] = None
 
 
@@ -78,9 +78,22 @@ class StateStore:
     def __init__(self, db_url: str = "sqlite:///./showrunner.db") -> None:
         self.logger = logging.getLogger(__name__)
         self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        # Initialise session factory and create tables
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         Base.metadata.create_all(bind=self.engine)
         self.logger.info("StateStore initialised with DB %s", db_url)
+
+    def get_state(self, event_id: str) -> EventState | None:
+        """Retrieve an ``EventState`` by its ``onchain_event_id``.
+
+        Returns ``None`` if the state is not found.
+        """
+        with self._session() as session:
+            result = session.execute(
+                select(EventModel).where(EventModel.onchain_event_id == event_id)
+            ).scalar_one_or_none()
+            # ``result`` is an ``EventModel`` instance or ``None``
+            return result.to_state() if result else None
 
     # ---------------------------------------------------------------------
     # Helper to obtain a fresh session
@@ -112,6 +125,12 @@ class StateStore:
             db.refresh(model)
             self.logger.debug("Created event %s", model.id)
             return model.to_state()
+
+    # Compatibility alias for existing workflow code
+    def create_state(self, state: EventState) -> EventState:
+        """Alias for ``create_event`` to maintain backward compatibility.
+        """
+        return self.create_event(state)
 
     def get_event_by_id(self, event_id: int) -> Optional[EventState]:
         with self._session() as db:
@@ -152,3 +171,9 @@ class StateStore:
             db.refresh(model)
             self.logger.debug("Updated event %s", model.id)
             return model.to_state()
+
+    # Alias for compatibility with existing workflow code
+    def update_state(self, state: EventState) -> EventState:
+        """Compatibility wrapper that forwards to ``update_event``.
+        """
+        return self.update_event(state)
